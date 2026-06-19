@@ -820,6 +820,90 @@ document.addEventListener('DOMContentLoaded', () => {
         const speed = parseInt(animationSpeedEl.value);
         const animate = animateCarvingEl.checked;
 
+        if (!animate) {
+            statusMsgEl.textContent = "Carving on C++ server...";
+            progressBarContainer.style.display = 'block';
+            progressBarFill.style.width = '50%';
+            
+            try {
+                // Convert current canvas to blob
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = currentWidth;
+                tempCanvas.height = currentHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.putImageData(currentImgData, 0, 0);
+                
+                const imageBlob = await new Promise(resolve => tempCanvas.toBlob(resolve, 'image/png'));
+                
+                // Get mask blob if it has constraints
+                let maskBlob = null;
+                const hasMask = Array.from(maskData).some(val => val !== 0);
+                if (hasMask) {
+                    maskBlob = await new Promise(resolve => maskCanvas.toBlob(resolve, 'image/png'));
+                }
+
+                // Prepare FormData matching the FastAPI REST contract
+                const formData = new FormData();
+                formData.append('image', imageBlob, 'image.png');
+                if (maskBlob) {
+                    formData.append('mask', maskBlob, 'mask.png');
+                }
+                formData.append('width', targetWidth);
+                formData.append('height', targetHeight);
+                formData.append('forward', isForward ? 'true' : 'false');
+
+                // Call REST API
+                const response = await fetch('/api/carve', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errDetail = await response.json().catch(() => ({ detail: 'Server carving failed' }));
+                    throw new Error(errDetail.detail || 'Server carving failed');
+                }
+                
+                const responseBlob = await response.blob();
+                
+                // Load returned image from server response
+                const img = new Image();
+                img.onload = function() {
+                    currentWidth = img.width;
+                    currentHeight = img.height;
+                    
+                    imageCanvas.width = currentWidth;
+                    imageCanvas.height = currentHeight;
+                    maskCanvas.width = currentWidth;
+                    maskCanvas.height = currentHeight;
+                    interactionCanvas.width = currentWidth;
+                    interactionCanvas.height = currentHeight;
+
+                    imgCtx.drawImage(img, 0, 0);
+                    currentImgData = imgCtx.getImageData(0, 0, currentWidth, currentHeight);
+                    
+                    // Reset mask after server resizing
+                    maskCtx.clearRect(0, 0, currentWidth, currentHeight);
+                    maskData = new Float32Array(currentWidth * currentHeight);
+
+                    updateWorkspaceView();
+                    updateMetrics();
+                    
+                    isProcessing = false;
+                    progressBarContainer.style.display = 'none';
+                    btnRun.textContent = "Run Carving";
+                    statusMsgEl.textContent = "Seam carving completed successfully via C++ server.";
+                    drawInteractionCanvas();
+                };
+                img.src = URL.createObjectURL(responseBlob);
+                return; // Server completed the request successfully
+                
+            } catch (err) {
+                console.error(err);
+                alert("Server-side C++ carving failed: " + err.message + "\nFalling back to client-side JavaScript carving...");
+                statusMsgEl.textContent = "Falling back to client-side JS...";
+            }
+        }
+
         while ((currentWidth > targetWidth || currentHeight > targetHeight) && !shouldStop) {
             if (currentWidth > targetWidth) {
                 const seam = findVerticalSeam(currentWidth, currentHeight, currentImgData, maskData, isForward);

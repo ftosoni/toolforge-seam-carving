@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const animateCarvingEl = document.getElementById('animate-carving');
     const showSeamsEl = document.getElementById('show-seams');
     const animationSpeedEl = document.getElementById('animation-speed');
+    const useServerBackendEl = document.getElementById('use-server-backend');
     
     const progressBarContainer = document.querySelector('.progress-bar-container');
     const progressBarFill = document.querySelector('.progress-bar-fill');
@@ -71,6 +72,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     btnFetchCommons.addEventListener('click', fetchFromCommons);
+
+    useServerBackendEl.addEventListener('change', () => {
+        const useServer = useServerBackendEl.checked;
+        animateCarvingEl.disabled = useServer;
+        showSeamsEl.disabled = useServer;
+        animationSpeedEl.disabled = useServer;
+    });
 
     async function fetchFromCommons() {
         let fileName = commonsCustomInputEl.value.trim();
@@ -818,9 +826,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const speed = parseInt(animationSpeedEl.value);
-        const animate = animateCarvingEl.checked;
+        const useServer = useServerBackendEl.checked;
+        const animate = animateCarvingEl.checked && !useServer;
 
-        if (!animate) {
+        if (useServer) {
             statusMsgEl.textContent = "Carving on C++ server...";
             progressBarContainer.style.display = 'block';
             progressBarFill.style.width = '50%';

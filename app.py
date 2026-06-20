@@ -137,39 +137,57 @@ async def carve_image(
                 
                 stage = "width"
                 
+                buffer = ""
                 while True:
-                    line = await process.stdout.readline()
-                    if not line:
+                    # Read up to 100 bytes from stdout
+                    chunk = await process.stdout.read(100)
+                    if not chunk:
                         break
-                    line_str = line.decode('utf-8', errors='replace').strip()
-                    if not line_str:
-                        continue
+                    buffer += chunk.decode('utf-8', errors='replace')
                     
-                    if "width seam" in line_str:
-                        stage = "width"
-                        yield json.dumps({"status": "info", "message": line_str}) + "\n"
-                    elif "height seam" in line_str:
-                        stage = "height"
-                        yield json.dumps({"status": "info", "message": line_str}) + "\n"
-                    elif "Progress:" in line_str:
-                        try:
-                            # e.g., "Progress: 10/100 (10%)" or similar
-                            clean_line = line_str.replace('\r', '').replace('Progress:', '').strip()
-                            parts = clean_line.split()
-                            ratio = parts[0]  # "10/100"
-                            curr_val, total_val = map(int, ratio.split('/'))
-                            pct = int(parts[1].strip('()%'))
-                            yield json.dumps({
-                                "status": "progress",
-                                "stage": stage,
-                                "current": curr_val,
-                                "total": total_val,
-                                "percent": pct
-                            }) + "\n"
-                        except Exception:
+                    # Process all complete lines separated by \n or \r
+                    while True:
+                        r_idx = buffer.find('\r')
+                        n_idx = buffer.find('\n')
+                        
+                        if r_idx == -1 and n_idx == -1:
+                            break
+                            
+                        if r_idx != -1 and (n_idx == -1 or r_idx < n_idx):
+                            line_str = buffer[:r_idx].strip()
+                            buffer = buffer[r_idx+1:]
+                        else:
+                            line_str = buffer[:n_idx].strip()
+                            buffer = buffer[n_idx+1:]
+                            
+                        if not line_str:
+                            continue
+                        
+                        if "width seam" in line_str:
+                            stage = "width"
                             yield json.dumps({"status": "info", "message": line_str}) + "\n"
-                    else:
-                        yield json.dumps({"status": "info", "message": line_str}) + "\n"
+                        elif "height seam" in line_str:
+                            stage = "height"
+                            yield json.dumps({"status": "info", "message": line_str}) + "\n"
+                        elif "Progress:" in line_str:
+                            try:
+                                # e.g., "Progress: 10/100 (10%)"
+                                clean_line = line_str.replace('Progress:', '').strip()
+                                parts = clean_line.split()
+                                ratio = parts[0]  # "10/100"
+                                curr_val, total_val = map(int, ratio.split('/'))
+                                pct = int(parts[1].strip('()%'))
+                                yield json.dumps({
+                                    "status": "progress",
+                                    "stage": stage,
+                                    "current": curr_val,
+                                    "total": total_val,
+                                    "percent": pct
+                                }) + "\n"
+                            except Exception:
+                                yield json.dumps({"status": "info", "message": line_str}) + "\n"
+                        else:
+                            yield json.dumps({"status": "info", "message": line_str}) + "\n"
                 
                 await process.wait()
                 

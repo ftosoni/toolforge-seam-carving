@@ -1,3 +1,6 @@
 cmake
 g++
 make
+build-essential
+libc6-dev
+

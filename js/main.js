@@ -59,6 +59,64 @@ document.addEventListener('DOMContentLoaded', () => {
     let isProcessing = false;
     let shouldStop = false;
 
+    // i18n Elements & Variables
+    const langSelectEl = document.getElementById('lang-select');
+    let currentLanguage = 'en';
+    let translations = {};
+
+    async function loadLanguage(lang) {
+        try {
+            const response = await fetch(`i18n/${lang}.json`);
+            if (!response.ok) throw new Error(`Could not load translations for ${lang}`);
+            translations = await response.json();
+            currentLanguage = lang;
+            applyTranslations();
+        } catch (err) {
+            console.error(err);
+            if (lang !== 'en') {
+                loadLanguage('en');
+            }
+        }
+    }
+
+    function applyTranslations() {
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (translations[key]) {
+                if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+                    return;
+                }
+                el.textContent = translations[key];
+            }
+        });
+
+        // Update placeholders
+        if (commonsCustomInputEl) {
+            commonsCustomInputEl.placeholder = currentLanguage === 'it' ? 'O nome file personalizzato su Commons' : 'Or custom File:Name.jpg';
+        }
+        
+        // Update current status message or buttons
+        if (!isProcessing) {
+            btnRun.textContent = translations['btn_run'] || "Run Carving";
+            if (!currentImgData) {
+                statusMsgEl.textContent = translations['status_upload_start'] || "Upload an image to start.";
+            } else {
+                statusMsgEl.textContent = translations['status_carving_paused'] || "Seam carving paused.";
+            }
+        } else {
+            btnRun.textContent = translations['btn_pause'] || "Pause Carving";
+        }
+        btnReset.textContent = translations['btn_reset'] || "Reset";
+        btnDownload.textContent = translations['btn_download'] || "Download Image";
+    }
+
+    if (langSelectEl) {
+        langSelectEl.addEventListener('change', () => {
+            loadLanguage(langSelectEl.value);
+        });
+        loadLanguage(langSelectEl.value || 'en');
+    }
+
     // Load Default Image/Placeholder click
     dropZone.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('click', (e) => e.stopPropagation());
@@ -354,9 +412,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (a > 0) {
                 if (g > r) {
-                    maskData[pixelIdx] = 1e9; // Protect
+                    maskData[pixelIdx] = 1e5; // Protect (finite large value)
                 } else if (r > g) {
-                    maskData[pixelIdx] = -1e9; // Remove
+                    maskData[pixelIdx] = -1e5; // Remove (finite large negative value)
                 }
             }
         }
@@ -830,9 +888,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const animate = animateCarvingEl.checked && !useServer;
 
         if (useServer) {
-            statusMsgEl.textContent = "Carving on C++ server...";
-            progressBarContainer.style.display = 'block';
-            progressBarFill.style.width = '50%';
+            statusMsgEl.textContent = translations['status_carving_server'] || "Carving on C++ server...";
+            
+            // Get elements for C++ progress bars
+            const cppProgressContainer = document.getElementById('cpp-progress-container');
+            const cppWidthWrapper = document.getElementById('cpp-progress-width-wrapper');
+            const cppHeightWrapper = document.getElementById('cpp-progress-height-wrapper');
+            const cppWidthFill = document.getElementById('cpp-progress-bar-width-fill');
+            const cppHeightFill = document.getElementById('cpp-progress-bar-height-fill');
+            const cppWidthText = document.getElementById('cpp-progress-width-text');
+            const cppHeightText = document.getElementById('cpp-progress-height-text');
+
+            // Show C++ progress bars, hide single progress bar
+            progressBarContainer.style.display = 'none';
+            cppProgressContainer.style.display = 'block';
+            cppWidthWrapper.style.display = 'none';
+            cppHeightWrapper.style.display = 'none';
+            cppWidthFill.style.width = '0%';
+            cppHeightFill.style.width = '0%';
+            cppWidthText.textContent = '0%';
+            cppHeightText.textContent = '0%';
             
             try {
                 // Convert current canvas to blob
@@ -861,55 +936,96 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('height', targetHeight);
                 formData.append('forward', isForward ? 'true' : 'false');
 
-                // Call REST API
+                // Call REST API and read as a stream of JSON lines
                 const response = await fetch('/api/carve', {
                     method: 'POST',
                     body: formData
                 });
                 
                 if (!response.ok) {
-                    const errDetail = await response.json().catch(() => ({ detail: 'Server carving failed' }));
-                    throw new Error(errDetail.detail || 'Server carving failed');
+                    throw new Error('Server carving failed');
                 }
                 
-                const responseBlob = await response.blob();
-                
-                // Load returned image from server response
-                const img = new Image();
-                img.onload = function() {
-                    currentWidth = img.width;
-                    currentHeight = img.height;
-                    
-                    imageCanvas.width = currentWidth;
-                    imageCanvas.height = currentHeight;
-                    maskCanvas.width = currentWidth;
-                    maskCanvas.height = currentHeight;
-                    interactionCanvas.width = currentWidth;
-                    interactionCanvas.height = currentHeight;
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
 
-                    imgCtx.drawImage(img, 0, 0);
-                    currentImgData = imgCtx.getImageData(0, 0, currentWidth, currentHeight);
-                    
-                    // Reset mask after server resizing
-                    maskCtx.clearRect(0, 0, currentWidth, currentHeight);
-                    maskData = new Float32Array(currentWidth * currentHeight);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                    updateWorkspaceView();
-                    updateMetrics();
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
                     
-                    isProcessing = false;
-                    progressBarContainer.style.display = 'none';
-                    btnRun.textContent = "Run Carving";
-                    statusMsgEl.textContent = "Seam carving completed successfully via C++ server.";
-                    drawInteractionCanvas();
-                };
-                img.src = URL.createObjectURL(responseBlob);
-                return; // Server completed the request successfully
+                    // Keep the last partial line in the buffer
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.status === 'progress') {
+                                if (data.stage === 'width') {
+                                    cppWidthWrapper.style.display = 'block';
+                                    cppWidthFill.style.width = `${data.percent}%`;
+                                    cppWidthText.textContent = `${data.percent}%`;
+                                    const t = currentLanguage === 'it' ? `Ridimensionamento larghezza: cucitura ${data.current} di ${data.total}` : `Carving width: seam ${data.current} of ${data.total}`;
+                                    statusMsgEl.textContent = t;
+                                } else if (data.stage === 'height') {
+                                    cppHeightWrapper.style.display = 'block';
+                                    cppHeightFill.style.width = `${data.percent}%`;
+                                    cppHeightText.textContent = `${data.percent}%`;
+                                    const t = currentLanguage === 'it' ? `Ridimensionamento altezza: cucitura ${data.current} di ${data.total}` : `Carving height: seam ${data.current} of ${data.total}`;
+                                    statusMsgEl.textContent = t;
+                                }
+                            } else if (data.status === 'info') {
+                                console.log("C++ Backend:", data.message);
+                            } else if (data.status === 'error') {
+                                throw new Error(data.message);
+                            } else if (data.status === 'done') {
+                                // Load returned image from base64 response
+                                const img = new Image();
+                                img.onload = function() {
+                                    currentWidth = img.width;
+                                    currentHeight = img.height;
+                                    
+                                    imageCanvas.width = currentWidth;
+                                    imageCanvas.height = currentHeight;
+                                    maskCanvas.width = currentWidth;
+                                    maskCanvas.height = currentHeight;
+                                    interactionCanvas.width = currentWidth;
+                                    interactionCanvas.height = currentHeight;
+
+                                    imgCtx.drawImage(img, 0, 0);
+                                    currentImgData = imgCtx.getImageData(0, 0, currentWidth, currentHeight);
+                                    
+                                    // Reset mask after server resizing
+                                    maskCtx.clearRect(0, 0, currentWidth, currentHeight);
+                                    maskData = new Float32Array(currentWidth * currentHeight);
+
+                                    updateWorkspaceView();
+                                    updateMetrics();
+                                    
+                                    isProcessing = false;
+                                    cppProgressContainer.style.display = 'none';
+                                    btnRun.textContent = translations['btn_run'] || "Run Carving";
+                                    statusMsgEl.textContent = translations['status_carving_completed_server'] || "Seam carving completed successfully via C++ server.";
+                                    drawInteractionCanvas();
+                                };
+                                img.src = data.image;
+                            }
+                        } catch (e) {
+                            console.error("Error parsing stream line:", e, line);
+                        }
+                    }
+                }
+                return; // Server completed successfully
                 
             } catch (err) {
                 console.error(err);
                 alert("Server-side C++ carving failed: " + err.message + "\nFalling back to client-side JavaScript carving...");
-                statusMsgEl.textContent = "Falling back to client-side JS...";
+                cppProgressContainer.style.display = 'none';
+                statusMsgEl.textContent = translations['status_fallback_js'] || "Falling back to client-side JS...";
             }
         }
 
@@ -969,9 +1085,9 @@ document.addEventListener('DOMContentLoaded', () => {
         drawInteractionCanvas();
 
         if (currentWidth === targetWidth && currentHeight === targetHeight) {
-            statusMsgEl.textContent = "Seam carving completed successfully.";
+            statusMsgEl.textContent = translations['status_carving_completed'] || "Seam carving completed successfully.";
         } else {
-            statusMsgEl.textContent = "Seam carving paused.";
+            statusMsgEl.textContent = translations['status_carving_paused'] || "Seam carving paused.";
         }
     }
 

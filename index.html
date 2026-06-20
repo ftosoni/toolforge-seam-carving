@@ -4,7 +4,7 @@
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
+  you may obtain a copy of the License at
 
       http://www.apache.org/licenses/LICENSE-2.0
 
@@ -48,14 +48,29 @@
     <header class="app-header" role="banner">
         <a href="/" class="app-header__brand" aria-label="Toolforge Seam Carving — home">
             <img src="branding/favicon.svg" alt="" class="app-header__brand-icon" aria-hidden="true" />
-            <span class="app-header__title">Seam Carving Utility</span>
+            <span class="app-header__title" data-i18n="app_title">Seam Carving Utility</span>
         </a>
         <nav class="app-header__actions" aria-label="App actions">
             <div class="lang-selector">
                 <span class="lang-selector__icon" aria-hidden="true">🌐</span>
                 <select id="lang-select" class="cdx-select" aria-label="Select language">
+                    <option value="as">অসমীয়া (AS)</option>
+                    <option value="bn">বাংলা (BN)</option>
                     <option value="en" selected>English (EN)</option>
+                    <option value="fr">Français (FR)</option>
+                    <option value="gu">ગુજરાતી (GU)</option>
+                    <option value="hi">हिन्दी (HI)</option>
                     <option value="it">Italiano (IT)</option>
+                    <option value="kn">ಕನ್ನಡ (KN)</option>
+                    <option value="mai">मैथिली (MAI)</option>
+                    <option value="ml">മലയാളം (ML)</option>
+                    <option value="mr">मराठी (MR)</option>
+                    <option value="or">ଓଡ଼ିଆ (OR)</option>
+                    <option value="pa">ਪੰਜਾਬੀ (PA)</option>
+                    <option value="sat">ᱥᱟᱱᱛᱟᱲᱤ (SAT)</option>
+                    <option value="ta">தமிழ் (TA)</option>
+                    <option value="te">తెలుగు (TE)</option>
+                    <option value="ur">اردو (UR)</option>
                 </select>
             </div>
             <a href="https://github.com/ftosoni/toolforge-seam-carving" class="cdx-button cdx-button--weight-quiet"
@@ -73,34 +88,34 @@
     <main class="app-main">
 
         <div class="page-hero">
-            <h1 class="page-hero__heading">Content-Aware Image Resizing</h1>
-            <p class="page-hero__desc">Retarget and scale images intelligently using the Seam Carving algorithm.</p>
+            <h1 class="page-hero__heading" data-i18n="hero_title">Content-Aware Image Resizing</h1>
+            <p class="page-hero__desc" data-i18n="hero_desc">Retarget and scale images intelligently using the Seam Carving algorithm.</p>
         </div>
 
         <div class="workspace-container">
             <!-- Left Panel: Controls -->
             <aside class="panel-card" id="controls-section">
-                <h2 class="panel-title">Configuration</h2>
+                <h2 class="panel-title" data-i18n="config_title">Configuration</h2>
 
                 <!-- Wikimedia Commons Image Selector -->
                 <div class="cdx-field" style="border-bottom: 1px solid #eaecf0; padding-bottom: 16px; margin-bottom: 16px;">
-                    <label class="cdx-label">Load from Wikimedia Commons</label>
+                    <label class="cdx-label" data-i18n="load_commons_label">Load from Wikimedia Commons</label>
                     <select id="commons-preset" class="cdx-select" style="margin-bottom: 8px; width: 100%;">
-                        <option value="" selected>-- Select a preset image --</option>
+                        <option value="" selected data-i18n="select_preset">-- Select a preset image --</option>
                         <option value="File:Die_letzten_Meter_zum_Gipfel.jpg">Die letzten Meter zum Gipfel</option>
                         <option value="File:Phalacrocorax_carbo,_Egretta_garzetta_and_Mareca_strepera_in_Taudha_Lake.jpg">Lake Birds (Taudha Lake)</option>
                         <option value="File:Вайдагубский_маяк.jpg">Вайдагубский маяк</option>
                     </select>
                     <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
                         <input type="text" id="commons-custom-input" class="cdx-text-input" placeholder="Or custom File:Name.jpg" style="flex: 1; font-size: 0.8125rem; min-width: 0;" />
-                        <button id="btn-fetch-commons" class="cdx-button cdx-button--action-progressive cdx-button--weight-primary" style="padding: 6px 12px; font-size: 0.8125rem; white-space: nowrap;">Fetch</button>
+                        <button id="btn-fetch-commons" class="cdx-button cdx-button--action-progressive cdx-button--weight-primary" style="padding: 6px 12px; font-size: 0.8125rem; white-space: nowrap;" data-i18n="fetch_btn">Fetch</button>
                     </div>
                     <div class="cdx-field" style="margin-bottom: 0;">
-                        <label class="cdx-label" for="commons-width-limit">Fetch Width</label>
+                        <label class="cdx-label" for="commons-width-limit" data-i18n="fetch_width_label">Fetch Width</label>
                         <select id="commons-width-limit" class="cdx-select" style="font-size: 0.8125rem; width: 100%;">
-                            <option value="400">400px (Fast)</option>
-                            <option value="600" selected>600px (Medium)</option>
-                            <option value="800">800px (Detail)</option>
+                            <option value="400">400px</option>
+                            <option value="600" selected>600px</option>
+                            <option value="800">800px</option>
                             <option value="original">Original Size</option>
                         </select>
                     </div>
@@ -108,93 +123,93 @@
 
                 <!-- Target Dimensions -->
                 <div class="cdx-field">
-                    <label class="cdx-label">Original Dimensions</label>
+                    <label class="cdx-label" data-i18n="original_dimensions">Original Dimensions</label>
                     <div style="font-size: 0.875rem; color: #54595d;">
-                        Width: <span id="input-width">0</span>px, Height: <span id="input-height">0</span>px
+                        <span data-i18n="width_label">Width</span>: <span id="input-width">0</span>px, <span data-i18n="height_label">Height</span>: <span id="input-height">0</span>px
                     </div>
                 </div>
 
                 <div class="dimensions-row">
                     <div class="cdx-field">
-                        <label class="cdx-label" for="target-width">Target Width (px)</label>
+                        <label class="cdx-label" for="target-width" data-i18n="target_width_label">Target Width (px)</label>
                         <input type="number" id="target-width" class="cdx-text-input" min="1" />
                     </div>
                     <div class="cdx-field">
-                        <label class="cdx-label" for="target-height">Target Height (px)</label>
+                        <label class="cdx-label" for="target-height" data-i18n="target_height_label">Target Height (px)</label>
                         <input type="number" id="target-height" class="cdx-text-input" min="1" />
                     </div>
                 </div>
 
                 <!-- Energy Mode Selection -->
                 <div class="cdx-field">
-                    <label class="cdx-label" for="energy-mode">Energy Formula</label>
+                    <label class="cdx-label" for="energy-mode" data-i18n="energy_formula_label">Energy Formula</label>
                     <select id="energy-mode" class="cdx-select">
-                        <option value="backward">Classic Backward Energy (Sobel)</option>
-                        <option value="forward" selected>Improved Forward Energy (Rubinstein 2008)</option>
+                        <option value="backward" data-i18n="formula_backward">Classic Backward Energy (Sobel)</option>
+                        <option value="forward" selected data-i18n="formula_forward">Improved Forward Energy (Rubinstein 2008)</option>
                     </select>
                 </div>
 
                 <!-- Paint Mask Protection / Removal -->
                 <div class="cdx-field">
-                    <label class="cdx-label">Constraint Brush</label>
+                    <label class="cdx-label" data-i18n="constraint_brush_label">Constraint Brush</label>
                     <div class="brush-group">
-                        <button class="brush-button active" data-brush="protect" title="Protect pixels (+infinity energy)">
+                        <button class="brush-button active" data-brush="protect" title="Protect pixels" data-i18n="brush_protect">
                             🟢 Protect
                         </button>
-                        <button class="brush-button" data-brush="remove" title="Force carving (-infinity energy)">
+                        <button class="brush-button" data-brush="remove" title="Force carving" data-i18n="brush_remove">
                             🔴 Remove
                         </button>
-                        <button class="brush-button" data-brush="erase" title="Erase constraints">
-                            🧹 Erase
+                        <button class="brush-button" data-brush="erase" title="Erase constraints" data-i18n="brush_erase">
+                            🧹 Local reset
                         </button>
                     </div>
                 </div>
 
                 <div class="cdx-field">
-                    <label class="cdx-label" for="brush-size">Brush Size (px)</label>
+                    <label class="cdx-label" for="brush-size" data-i18n="brush_size_label">Brush Size (px)</label>
                     <input type="range" id="brush-size" min="5" max="100" value="20" style="width: 100%;" />
                 </div>
 
                 <div class="cdx-field">
-                    <button id="btn-clear-mask" class="cdx-button cdx-button--weight-quiet" style="width: 100%; border: 1px solid #c8ccd1;">
+                    <button id="btn-clear-mask" class="cdx-button cdx-button--weight-quiet" style="width: 100%; border: 1px solid #c8ccd1;" data-i18n="clear_mask_btn">
                         Clear All Constraints
                     </button>
                 </div>
 
                 <!-- Visual Customizer settings -->
                 <div class="cdx-field" style="border-top: 1px solid #eaecf0; padding-top: 16px;">
-                    <label class="cdx-label">Visual Settings</label>
+                    <label class="cdx-label" data-i18n="visual_settings_label">Visual Settings</label>
                     <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
                         <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; cursor: pointer;">
-                            <input type="checkbox" id="view-grayscale" checked /> Grayscale workspace
+                            <input type="checkbox" id="view-grayscale" checked /><span data-i18n="setting_grayscale">Grayscale workspace</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; cursor: pointer;">
-                            <input type="checkbox" id="animate-carving" checked /> Animate process <span style="color: #72777d; font-size: 0.75rem;">(Slower, client-side)</span>
+                            <input type="checkbox" id="animate-carving" checked /><span data-i18n="setting_animate">Animate process</span> <span style="color: #72777d; font-size: 0.75rem;" data-i18n="setting_animate_sub">(Slower, client-side)</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; cursor: pointer;">
-                            <input type="checkbox" id="show-seams" checked /> Highlight active seams <span style="color: #72777d; font-size: 0.75rem;">(Slower)</span>
+                            <input type="checkbox" id="show-seams" checked /><span data-i18n="setting_seams">Highlight active seams</span> <span style="color: #72777d; font-size: 0.75rem;" data-i18n="setting_seams_sub">(Slower)</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; cursor: pointer; border-top: 1px solid #eaecf0; padding-top: 8px; margin-top: 4px;">
-                            <input type="checkbox" id="use-server-backend" /> Use C++ server processing <span style="color: #72777d; font-size: 0.75rem;">(Fast, for large images)</span>
+                            <input type="checkbox" id="use-server-backend" /><span data-i18n="setting_server">Use C++ server processing</span> <span style="color: #d33d33; font-weight: 500; font-size: 0.75rem;" data-i18n="setting_server_sub">(Slower on Toolforge; JS is faster)</span>
                         </label>
                     </div>
                 </div>
 
                 <div class="cdx-field">
-                    <label class="cdx-label" for="animation-speed">Animation Speed</label>
+                    <label class="cdx-label" for="animation-speed" data-i18n="animation_speed_label">Animation Speed</label>
                     <input type="range" id="animation-speed" min="1" max="100" value="85" style="width: 100%;" />
                 </div>
             </aside>
 
             <!-- Right Panel: Canvas Workspace -->
             <section class="panel-card canvas-card" style="flex: 1; width: 100%;">
-                <h2 class="panel-title" style="width: 100%;">Workspace</h2>
+                <h2 class="panel-title" style="width: 100%;" data-i18n="workspace_title">Workspace</h2>
                 
                 <!-- Upload Dropzone / Placeholder -->
                 <div id="drop-zone" class="canvas-placeholder" style="border: 2px dashed #a2a9b1; border-radius: 8px; padding: 60px 20px;">
                     <span class="canvas-placeholder-icon">📷</span>
-                    <h3>Drag & Drop your image here</h3>
-                    <p>or click to browse from your computer</p>
+                    <h3 data-i18n="drop_zone_title">Drag & Drop your image here</h3>
+                    <p data-i18n="drop_zone_desc">or click to browse from your computer</p>
                     <input type="file" id="file-input" accept="image/*" style="display: none;" />
                 </div>
 
@@ -209,19 +224,41 @@
                     <div class="progress-bar-fill"></div>
                 </div>
 
+                <!-- Two loading bars for C++ server-side execution progress -->
+                <div id="cpp-progress-container" style="display: none; margin: 16px 0; width: 100%;">
+                    <div id="cpp-progress-width-wrapper" style="margin-bottom: 12px; display: none;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8125rem; color: #202122; margin-bottom: 4px;">
+                            <span>Width Carving Progress:</span>
+                            <span id="cpp-progress-width-text">0%</span>
+                        </div>
+                        <div style="background-color: #eaecf0; height: 8px; border-radius: 4px; overflow: hidden; width: 100%;">
+                            <div id="cpp-progress-bar-width-fill" style="background-color: #00af89; height: 100%; width: 0%; transition: width 0.1s ease-in-out;"></div>
+                        </div>
+                    </div>
+                    <div id="cpp-progress-height-wrapper" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8125rem; color: #202122; margin-bottom: 4px;">
+                            <span>Height Carving Progress:</span>
+                            <span id="cpp-progress-height-text">0%</span>
+                        </div>
+                        <div style="background-color: #eaecf0; height: 8px; border-radius: 4px; overflow: hidden; width: 100%;">
+                            <div id="cpp-progress-bar-height-fill" style="background-color: #3366cc; height: 100%; width: 0%; transition: width 0.1s ease-in-out;"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="metrics-info">
-                    <span id="status-msg">Upload an image to start.</span>
+                    <span id="status-msg" data-i18n="status_upload_start">Upload an image to start.</span>
                     <span id="current-dimensions"></span>
                 </div>
 
                 <div class="action-row">
-                    <button id="btn-run" class="cdx-button cdx-button--action-progressive cdx-button--weight-primary" disabled>
+                    <button id="btn-run" class="cdx-button cdx-button--action-progressive cdx-button--weight-primary" disabled data-i18n="btn_run">
                         Run Carving
                     </button>
-                    <button id="btn-reset" class="cdx-button cdx-button--weight-quiet" style="border: 1px solid #c8ccd1;">
+                    <button id="btn-reset" class="cdx-button cdx-button--weight-quiet" style="border: 1px solid #c8ccd1;" data-i18n="btn_reset">
                         Reset
                     </button>
-                    <button id="btn-download" class="cdx-button cdx-button--action-progressive cdx-button--weight-primary">
+                    <button id="btn-download" class="cdx-button cdx-button--action-progressive cdx-button--weight-primary" data-i18n="btn_download">
                         Download Image
                     </button>
                 </div>
@@ -238,30 +275,30 @@
 
             <!-- Column 1: Credits -->
             <div class="footer-section" style="display: flex; flex-direction: column; gap: 12px;">
-                <h4 style="font-size: 0.75rem; font-weight: 700; color: #54595d; text-transform: uppercase; margin: 0; letter-spacing: 0.06em;">
+                <h4 style="font-size: 0.75rem; font-weight: 700; color: #54595d; text-transform: uppercase; margin: 0; letter-spacing: 0.06em;" data-i18n="credits">
                     Credits</h4>
                 <div style="font-size: 0.8125rem; line-height: 1.5; color: #202122;">
-                    Developed by:&nbsp;<a href="https://meta.wikimedia.org/wiki/Special:MyLanguage/User:Super-nabla"
+                    <span data-i18n="developed_by">Developed by</span>:&nbsp;<a href="https://meta.wikimedia.org/wiki/Special:MyLanguage/User:Super-nabla"
                         target="_blank" rel="noopener noreferrer">Super nabla 🪰</a>
                 </div>
             </div>
 
             <!-- Column 2: Resources -->
             <div class="footer-section" style="display: flex; flex-direction: column; gap: 12px;">
-                <h4 style="font-size: 0.75rem; font-weight: 700; color: #54595d; text-transform: uppercase; margin: 0; letter-spacing: 0.06em;">
+                <h4 style="font-size: 0.75rem; font-weight: 700; color: #54595d; text-transform: uppercase; margin: 0; letter-spacing: 0.06em;" data-i18n="resources">
                     Resources</h4>
                 <div>
                     <a href="https://github.com/ftosoni/toolforge-seam-carving" target="_blank" rel="noopener noreferrer"
-                        style="font-size: 0.8125rem; color: #3366cc; text-decoration: none;">GitHub Codebase</a>
+                        style="font-size: 0.8125rem; color: #3366cc; text-decoration: none;" data-i18n="resources">GitHub Codebase</a>
                 </div>
             </div>
 
             <!-- Column 3: Licence -->
             <div class="footer-section" style="display: flex; flex-direction: column; gap: 12px;">
-                <h4 style="font-size: 0.75rem; font-weight: 700; color: #54595d; text-transform: uppercase; margin: 0; letter-spacing: 0.06em;">
+                <h4 style="font-size: 0.75rem; font-weight: 700; color: #54595d; text-transform: uppercase; margin: 0; letter-spacing: 0.06em;" data-i18n="license">
                     Licence</h4>
                 <div style="font-size: 0.8125rem; color: #202122;">
-                    Released under the <a href="https://github.com/ftosoni/toolforge-seam-carving/blob/main/LICENCE.txt"
+                    <span data-i18n="released_under">Released under the</span> <a href="https://github.com/ftosoni/toolforge-seam-carving/blob/main/LICENCE.txt"
                         target="_blank" rel="noopener noreferrer" style="font-weight: 700; color: #3366cc;">Apache-2.0</a>
                 </div>
             </div>

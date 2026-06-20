@@ -2,9 +2,11 @@ import os
 import shutil
 import tempfile
 import subprocess
+import base64
+import asyncio
 from typing import Optional
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, status
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -66,6 +68,8 @@ def get_binary() -> str:
         detail="Seam carving backend binary not found. Please compile the C++ submodule using cmake."
     )
 
+import json
+
 # Static Files serving
 if os.path.exists("css"):
     app.mount("/css", StaticFiles(directory="css"), name="css")
@@ -82,7 +86,7 @@ def read_root():
             return HTMLResponse(content=f.read())
     raise HTTPException(status_code=404, detail="index.html not found")
 
-@app.post("/api/carve", response_class=FileResponse, summary="Perform Seam Carving on an image")
+@app.post("/api/carve", summary="Perform Seam Carving on an image with progress streaming")
 async def carve_image(
     image: UploadFile = File(..., description="The source image file to resize"),
     width: Optional[int] = Form(None, description="Target width in pixels"),
@@ -91,59 +95,104 @@ async def carve_image(
     mask: Optional[UploadFile] = File(None, description="Optional mask image for object protection (green/white) or removal (red/black)")
 ):
     bin_p = get_binary()
-    
-    # Create a temporary directory to store files
-    with tempfile.TemporaryDirectory() as tmpdir:
-        input_ext = os.path.splitext(image.filename)[1] or ".png"
-        input_path = os.path.join(tmpdir, f"input{input_ext}")
-        output_path = os.path.join(tmpdir, f"output{input_ext}")
+    input_ext = os.path.splitext(image.filename)[1] or ".png"
 
-        # Save uploaded image
-        with open(input_path, "wb") as buffer:
-            shutil.copyfileobj(image.file, buffer)
+    async def event_generator():
+        # Keep temporary directory alive during streaming
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, f"input{input_ext}")
+            output_path = os.path.join(tmpdir, f"output{input_ext}")
 
-        # Build command arguments
-        cmd = [bin_p, input_path, output_path]
+            # Save uploaded image
+            with open(input_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
 
-        if width is not None:
-            cmd.extend(["-w", str(width)])
-        if height is not None:
-            cmd.extend(["-h", str(height)])
-        if forward:
-            cmd.append("--forward")
+            # Build command arguments
+            cmd = [bin_p, input_path, output_path]
 
-        # Save mask if provided
-        if mask:
-            mask_ext = os.path.splitext(mask.filename)[1] or ".png"
-            mask_path = os.path.join(tmpdir, f"mask{mask_ext}")
-            with open(mask_path, "wb") as buffer:
-                shutil.copyfileobj(mask.file, buffer)
-            cmd.extend(["-m", mask_path])
+            if width is not None:
+                cmd.extend(["-w", str(width)])
+            if height is not None:
+                cmd.extend(["-h", str(height)])
+            if forward:
+                cmd.append("--forward")
 
-        try:
-            # Run C++ submodule executable
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        except subprocess.CalledProcessError as err:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Seam carving binary failed: {err.stderr or err.stdout}"
-            )
+            # Save mask if provided
+            if mask:
+                mask_ext = os.path.splitext(mask.filename)[1] or ".png"
+                mask_path = os.path.join(tmpdir, f"mask{mask_ext}")
+                with open(mask_path, "wb") as buffer:
+                    shutil.copyfileobj(mask.file, buffer)
+                cmd.extend(["-m", mask_path])
 
-        # Check if output file exists
-        if not os.path.exists(output_path):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Seam carving completed but output image was not generated."
-            )
+            try:
+                # Start C++ subprocess asynchronously to read progress from stdout
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT
+                )
+                
+                stage = "width"
+                
+                while True:
+                    line = await process.stdout.readline()
+                    if not line:
+                        break
+                    line_str = line.decode('utf-8', errors='replace').strip()
+                    if not line_str:
+                        continue
+                    
+                    if "width seam" in line_str:
+                        stage = "width"
+                        yield json.dumps({"status": "info", "message": line_str}) + "\n"
+                    elif "height seam" in line_str:
+                        stage = "height"
+                        yield json.dumps({"status": "info", "message": line_str}) + "\n"
+                    elif "Progress:" in line_str:
+                        try:
+                            # e.g., "Progress: 10/100 (10%)" or similar
+                            clean_line = line_str.replace('\r', '').replace('Progress:', '').strip()
+                            parts = clean_line.split()
+                            ratio = parts[0]  # "10/100"
+                            curr_val, total_val = map(int, ratio.split('/'))
+                            pct = int(parts[1].strip('()%'))
+                            yield json.dumps({
+                                "status": "progress",
+                                "stage": stage,
+                                "current": curr_val,
+                                "total": total_val,
+                                "percent": pct
+                            }) + "\n"
+                        except Exception:
+                            yield json.dumps({"status": "info", "message": line_str}) + "\n"
+                    else:
+                        yield json.dumps({"status": "info", "message": line_str}) + "\n"
+                
+                await process.wait()
+                
+                if process.returncode != 0:
+                    yield json.dumps({"status": "error", "message": f"Seam carving binary exited with code {process.returncode}"}) + "\n"
+                    return
+                
+            except Exception as err:
+                yield json.dumps({"status": "error", "message": f"Failed to run process: {str(err)}"}) + "\n"
+                return
 
-        # Copy file outside temp directory context to ensure it remains accessible during response streaming
-        persistent_output = os.path.join(tempfile.gettempdir(), f"carved_output_{os.urandom(8).hex()}{input_ext}")
-        shutil.copyfile(output_path, persistent_output)
+            # Check if output file exists and encode to base64
+            if os.path.exists(output_path):
+                try:
+                    with open(output_path, "rb") as f:
+                        encoded = base64.b64encode(f.read()).decode('utf-8')
+                    mime = "image/png" if input_ext.lower() == ".png" else "image/jpeg"
+                    yield json.dumps({
+                        "status": "done",
+                        "image": f"data:{mime};base64,{encoded}"
+                    }) + "\n"
+                except Exception as e:
+                    yield json.dumps({"status": "error", "message": f"Failed to read/encode output image: {str(e)}"}) + "\n"
+            else:
+                yield json.dumps({"status": "error", "message": "Output image was not generated."}) + "\n"
 
-        # Background task clean-up for the persistent file is handled naturally by FileResponse if needed,
-        # but to be clean, we just return it.
-        return FileResponse(
-            persistent_output, 
-            media_type="image/png" if input_ext.lower() == ".png" else "image/jpeg",
-            filename=f"carved_{image.filename}"
-        )
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+

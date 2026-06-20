@@ -11,8 +11,9 @@ if [ -d "/layers" ]; then
         find "$APT_DIR" -name "libc.so" -o -name "libpthread.so" 2>/dev/null | while read -r script; do
             if [ -f "$script" ] && [ ! -L "$script" ]; then
                 echo "Patching linker script: $script"
-                sed -i "s|/usr/lib/x86_64-linux-gnu/|$APT_DIR/usr/lib/x86_64-linux-gnu/|g" "$script"
-                sed -i "s|/lib/x86_64-linux-gnu/|$APT_DIR/lib/x86_64-linux-gnu/|g" "$script"
+                # Fix only the specific paths to nonshared static libraries
+                sed -i "s|/usr/lib/x86_64-linux-gnu/libc_nonshared.a|$APT_DIR/usr/lib/x86_64-linux-gnu/libc_nonshared.a|g" "$script"
+                sed -i "s|/usr/lib/x86_64-linux-gnu/libpthread_nonshared.a|$APT_DIR/usr/lib/x86_64-linux-gnu/libpthread_nonshared.a|g" "$script"
             fi
         done
     done

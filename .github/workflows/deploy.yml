@@ -14,8 +14,8 @@ jobs:
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: login.toolforge.org
-        username: tools.seam-carving
+        username: supnabla
         key: ${{ secrets.TOOLFORGE_SSH_KEY }}
-        # Runs the deploy.sh script directly on the bastion
+        # Runs the deploy.sh script using become to switch to the tool account
         script: |
-          bash deploy.sh
+          become seam-carving bash deploy.sh

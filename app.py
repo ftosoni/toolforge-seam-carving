@@ -75,6 +75,8 @@ if os.path.exists("css"):
     app.mount("/css", StaticFiles(directory="css"), name="css")
 if os.path.exists("js"):
     app.mount("/js", StaticFiles(directory="js"), name="js")
+if os.path.exists("i18n"):
+    app.mount("/i18n", StaticFiles(directory="i18n"), name="i18n")
 if os.path.exists("branding"):
     app.mount("/branding", StaticFiles(directory="branding"), name="branding")
 

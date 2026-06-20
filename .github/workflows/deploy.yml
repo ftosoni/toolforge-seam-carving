@@ -16,6 +16,9 @@ jobs:
         host: login.toolforge.org
         username: supnabla
         key: ${{ secrets.TOOLFORGE_SSH_KEY }}
-        # Runs the deploy.sh script using become to switch to the tool account
+        # Runs the deploy commands directly under the tool account
         script: |
-          become seam-carving bash deploy.sh
+          become seam-carving toolforge webservice buildservice stop --mount=all
+          become seam-carving toolforge build clean -y
+          become seam-carving toolforge build start https://github.com/ftosoni/toolforge-seam-carving
+          become seam-carving toolforge webservice buildservice start --mount=all -m 6Gi

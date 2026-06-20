@@ -373,9 +373,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Interactive Painting logic
     function getMousePos(canvas, evt) {
         const rect = canvas.getBoundingClientRect();
+        const clientX = evt.touches && evt.touches[0] ? evt.touches[0].clientX : evt.clientX;
+        const clientY = evt.touches && evt.touches[0] ? evt.touches[0].clientY : evt.clientY;
         return {
-            x: Math.floor((evt.clientX - rect.left) / rect.width * canvas.width),
-            y: Math.floor((evt.clientY - rect.top) / rect.height * canvas.height)
+            x: Math.floor((clientX - rect.left) / rect.width * canvas.width),
+            y: Math.floor((clientY - rect.top) / rect.height * canvas.height)
         };
     }
 
@@ -433,6 +435,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('mouseup', () => {
+        isDrawing = false;
+    });
+
+    // Touch support for mobile devices
+    interactionCanvas.addEventListener('touchstart', (e) => {
+        if (isProcessing) return;
+        isDrawing = true;
+        drawPaint(getMousePos(interactionCanvas, e));
+        if (e.cancelable) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    interactionCanvas.addEventListener('touchmove', (e) => {
+        if (!isDrawing || isProcessing) return;
+        drawPaint(getMousePos(interactionCanvas, e));
+        if (e.cancelable) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => {
         isDrawing = false;
     });
 

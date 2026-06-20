@@ -28,6 +28,9 @@ if [ -n "$APT_DIR" ] && [ -d "$APT_DIR" ]; then
     export CPATH="$APT_DIR/usr/include:$APT_DIR/usr/include/x86_64-linux-gnu${CPATH:+:$CPATH}"
     export LIBRARY_PATH="$APT_DIR/usr/lib/x86_64-linux-gnu:$APT_DIR/lib/x86_64-linux-gnu${LIBRARY_PATH:+:$LIBRARY_PATH}"
     export LD_LIBRARY_PATH="$APT_DIR/usr/lib/x86_64-linux-gnu:$APT_DIR/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    # Use -idirafter to make sure #include_next <stdlib.h> checks the apt layers after the C++ header directory
+    export CFLAGS="-idirafter $APT_DIR/usr/include -idirafter $APT_DIR/usr/include/x86_64-linux-gnu ${CFLAGS:-}"
+    export CXXFLAGS="-idirafter $APT_DIR/usr/include -idirafter $APT_DIR/usr/include/x86_64-linux-gnu ${CXXFLAGS:-}"
 fi
 
 cmake -B seam-carving/build -DCMAKE_BUILD_TYPE=Release seam-carving

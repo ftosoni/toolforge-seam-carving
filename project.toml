@@ -1,0 +1,11 @@
+[_]
+schema-version = "0.2"
+
+[com.heroku.buildpacks.deb-packages]
+install = [
+    "cmake",
+    "g++",
+    "make",
+    "build-essential",
+    "libc6-dev"
+]

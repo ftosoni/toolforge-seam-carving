@@ -904,6 +904,274 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function insertVerticalSeams(k, isForward, useLuma) {
+        // Make copies of the current state to find seams
+        let tempWidth = currentWidth;
+        let tempHeight = currentHeight;
+        let tempImgData = imgCtx.createImageData(tempWidth, tempHeight);
+        tempImgData.data.set(currentImgData.data);
+        let tempMaskData = new Float32Array(maskData.length);
+        tempMaskData.set(maskData);
+
+        // Track index mapping
+        let indexMap = new Int32Array(currentWidth * currentHeight);
+        for (let y = 0; y < currentHeight; y++) {
+            for (let x = 0; x < currentWidth; x++) {
+                indexMap[y * currentWidth + x] = x;
+            }
+        }
+
+        const seamsToInsert = [];
+        for (let step = 0; step < k; step++) {
+            const seam = findVerticalSeam(tempWidth, tempHeight, tempImgData, tempMaskData, isForward, useLuma);
+            
+            const origSeam = new Int32Array(currentHeight);
+            for (let y = 0; y < currentHeight; y++) {
+                const seamX = seam[y];
+                origSeam[y] = indexMap[y * tempWidth + seamX];
+            }
+            seamsToInsert.push(origSeam);
+
+            const nextWidth = tempWidth - 1;
+            const nextImgData = imgCtx.createImageData(nextWidth, tempHeight);
+            const nextMask = new Float32Array(nextWidth * tempHeight);
+            const nextIndexMap = new Int32Array(nextWidth * tempHeight);
+
+            for (let y = 0; y < tempHeight; y++) {
+                const seamX = seam[y];
+                let dstX = 0;
+                for (let x = 0; x < tempWidth; x++) {
+                    if (x === seamX) continue;
+                    const srcIdx = (y * tempWidth + x) * 4;
+                    const dstIdx = (y * nextWidth + dstX) * 4;
+                    nextImgData.data[dstIdx] = tempImgData.data[srcIdx];
+                    nextImgData.data[dstIdx + 1] = tempImgData.data[srcIdx + 1];
+                    nextImgData.data[dstIdx + 2] = tempImgData.data[srcIdx + 2];
+                    nextImgData.data[dstIdx + 3] = tempImgData.data[srcIdx + 3];
+
+                    nextMask[y * nextWidth + dstX] = tempMaskData[y * tempWidth + x];
+                    nextIndexMap[y * nextWidth + dstX] = indexMap[y * tempWidth + x];
+                    dstX++;
+                }
+            }
+            tempWidth = nextWidth;
+            tempImgData = nextImgData;
+            tempMaskData = nextMask;
+            indexMap = nextIndexMap;
+        }
+
+        const rowColsToDuplicate = [];
+        for (let y = 0; y < currentHeight; y++) {
+            const cols = [];
+            for (let j = 0; j < k; j++) {
+                cols.push(seamsToInsert[j][y]);
+            }
+            cols.sort((a, b) => a - b);
+            rowColsToDuplicate.push(cols);
+        }
+
+        const newWidth = currentWidth + k;
+        const newImgData = imgCtx.createImageData(newWidth, currentHeight);
+        const newMask = new Float32Array(newWidth * currentHeight);
+        const newMaskImg = maskCtx.createImageData(newWidth, currentHeight);
+
+        const srcData = currentImgData.data;
+        const dstData = newImgData.data;
+        const oldMaskImg = maskCtx.getImageData(0, 0, currentWidth, currentHeight);
+
+        for (let y = 0; y < currentHeight; y++) {
+            const cols = rowColsToDuplicate[y];
+            let srcCol = 0;
+            let dstCol = 0;
+            let colsInserted = 0;
+
+            while (srcCol < currentWidth) {
+                const srcIdx = (y * currentWidth + srcCol) * 4;
+                const dstIdx = (y * newWidth + dstCol) * 4;
+                dstData[dstIdx] = srcData[srcIdx];
+                dstData[dstIdx + 1] = srcData[srcIdx + 1];
+                dstData[dstIdx + 2] = srcData[srcIdx + 2];
+                dstData[dstIdx + 3] = srcData[srcIdx + 3];
+
+                newMask[y * newWidth + dstCol] = maskData[y * currentWidth + srcCol];
+
+                newMaskImg.data[dstIdx] = oldMaskImg.data[srcIdx];
+                newMaskImg.data[dstIdx + 1] = oldMaskImg.data[srcIdx + 1];
+                newMaskImg.data[dstIdx + 2] = oldMaskImg.data[srcIdx + 2];
+                newMaskImg.data[dstIdx + 3] = oldMaskImg.data[srcIdx + 3];
+
+                dstCol++;
+
+                if (colsInserted < k && cols[colsInserted] === srcCol) {
+                    let nextCol = (srcCol + 1 < currentWidth) ? (srcCol + 1) : (srcCol - 1);
+                    if (nextCol < 0) nextCol = srcCol;
+
+                    const nbrIdx = (y * currentWidth + nextCol) * 4;
+                    const dupIdx = (y * newWidth + dstCol) * 4;
+
+                    dstData[dupIdx] = Math.floor((srcData[srcIdx] + srcData[nbrIdx]) / 2);
+                    dstData[dupIdx + 1] = Math.floor((srcData[srcIdx + 1] + srcData[nbrIdx + 1]) / 2);
+                    dstData[dupIdx + 2] = Math.floor((srcData[srcIdx + 2] + srcData[nbrIdx + 2]) / 2);
+                    dstData[dupIdx + 3] = Math.floor((srcData[srcIdx + 3] + srcData[nbrIdx + 3]) / 2);
+
+                    newMask[y * newWidth + dstCol] = (maskData[y * currentWidth + srcCol] + maskData[y * currentWidth + nextCol]) / 2;
+
+                    newMaskImg.data[dupIdx] = Math.floor((oldMaskImg.data[srcIdx] + oldMaskImg.data[nbrIdx]) / 2);
+                    newMaskImg.data[dupIdx + 1] = Math.floor((oldMaskImg.data[srcIdx + 1] + oldMaskImg.data[nbrIdx + 1]) / 2);
+                    newMaskImg.data[dupIdx + 2] = Math.floor((oldMaskImg.data[srcIdx + 2] + oldMaskImg.data[nbrIdx + 2]) / 2);
+                    newMaskImg.data[dupIdx + 3] = Math.floor((oldMaskImg.data[srcIdx + 3] + oldMaskImg.data[nbrIdx + 3]) / 2);
+
+                    dstCol++;
+                    colsInserted++;
+                }
+                srcCol++;
+            }
+        }
+
+        currentWidth = newWidth;
+        currentImgData = newImgData;
+        maskData = newMask;
+
+        imageCanvas.width = currentWidth;
+        maskCanvas.width = currentWidth;
+        interactionCanvas.width = currentWidth;
+
+        maskCtx.putImageData(newMaskImg, 0, 0);
+    }
+
+    function insertHorizontalSeams(k, isForward, useLuma) {
+        let tempWidth = currentWidth;
+        let tempHeight = currentHeight;
+        let tempImgData = imgCtx.createImageData(tempWidth, tempHeight);
+        tempImgData.data.set(currentImgData.data);
+        let tempMaskData = new Float32Array(maskData.length);
+        tempMaskData.set(maskData);
+
+        let indexMap = new Int32Array(currentWidth * currentHeight);
+        for (let y = 0; y < currentHeight; y++) {
+            for (let x = 0; x < currentWidth; x++) {
+                indexMap[y * currentWidth + x] = y;
+            }
+        }
+
+        const seamsToInsert = [];
+        for (let step = 0; step < k; step++) {
+            const seam = findHorizontalSeam(tempWidth, tempHeight, tempImgData, tempMaskData, isForward, useLuma);
+            
+            const origSeam = new Int32Array(currentWidth);
+            for (let x = 0; x < currentWidth; x++) {
+                const seamY = seam[x];
+                origSeam[x] = indexMap[seamY * tempWidth + x];
+            }
+            seamsToInsert.push(origSeam);
+
+            const nextHeight = tempHeight - 1;
+            const nextImgData = imgCtx.createImageData(tempWidth, nextHeight);
+            const nextMask = new Float32Array(tempWidth * nextHeight);
+            const nextIndexMap = new Int32Array(tempWidth * nextHeight);
+
+            for (let x = 0; x < tempWidth; x++) {
+                const seamY = seam[x];
+                let dstY = 0;
+                for (let y = 0; y < tempHeight; y++) {
+                    if (y === seamY) continue;
+                    const srcIdx = (y * tempWidth + x) * 4;
+                    const dstIdx = (dstY * tempWidth + x) * 4;
+                    nextImgData.data[dstIdx] = tempImgData.data[srcIdx];
+                    nextImgData.data[dstIdx + 1] = tempImgData.data[srcIdx + 1];
+                    nextImgData.data[dstIdx + 2] = tempImgData.data[srcIdx + 2];
+                    nextImgData.data[dstIdx + 3] = tempImgData.data[srcIdx + 3];
+
+                    nextMask[dstY * tempWidth + x] = tempMaskData[y * tempWidth + x];
+                    nextIndexMap[dstY * tempWidth + x] = indexMap[y * tempWidth + x];
+                    dstY++;
+                }
+            }
+            tempHeight = nextHeight;
+            tempImgData = nextImgData;
+            tempMaskData = nextMask;
+            indexMap = nextIndexMap;
+        }
+
+        const colRowsToDuplicate = [];
+        for (let x = 0; x < currentWidth; x++) {
+            const rows = [];
+            for (let j = 0; j < k; j++) {
+                rows.push(seamsToInsert[j][x]);
+            }
+            rows.sort((a, b) => a - b);
+            colRowsToDuplicate.push(rows);
+        }
+
+        const newHeight = currentHeight + k;
+        const newImgData = imgCtx.createImageData(currentWidth, newHeight);
+        const newMask = new Float32Array(currentWidth * newHeight);
+        const newMaskImg = maskCtx.createImageData(currentWidth, newHeight);
+
+        const srcData = currentImgData.data;
+        const dstData = newImgData.data;
+        const oldMaskImg = maskCtx.getImageData(0, 0, currentWidth, currentHeight);
+
+        for (let x = 0; x < currentWidth; x++) {
+            const rows = colRowsToDuplicate[x];
+            let srcRow = 0;
+            let dstRow = 0;
+            let rowsInserted = 0;
+
+            while (srcRow < currentHeight) {
+                const srcIdx = (srcRow * currentWidth + x) * 4;
+                const dstIdx = (dstRow * currentWidth + x) * 4;
+                dstData[dstIdx] = srcData[srcIdx];
+                dstData[dstIdx + 1] = srcData[srcIdx + 1];
+                dstData[dstIdx + 2] = srcData[srcIdx + 2];
+                dstData[dstIdx + 3] = srcData[srcIdx + 3];
+
+                newMask[dstRow * currentWidth + x] = maskData[srcRow * currentWidth + x];
+
+                newMaskImg.data[dstIdx] = oldMaskImg.data[srcIdx];
+                newMaskImg.data[dstIdx + 1] = oldMaskImg.data[srcIdx + 1];
+                newMaskImg.data[dstIdx + 2] = oldMaskImg.data[srcIdx + 2];
+                newMaskImg.data[dstIdx + 3] = oldMaskImg.data[srcIdx + 3];
+
+                dstRow++;
+
+                if (rowsInserted < k && rows[rowsInserted] === srcRow) {
+                    let nextRow = (srcRow + 1 < currentHeight) ? (srcRow + 1) : (srcRow - 1);
+                    if (nextRow < 0) nextRow = srcRow;
+
+                    const nbrIdx = (nextRow * currentWidth + x) * 4;
+                    const dupIdx = (dstRow * currentWidth + x) * 4;
+
+                    dstData[dupIdx] = Math.floor((srcData[srcIdx] + srcData[nbrIdx]) / 2);
+                    dstData[dupIdx + 1] = Math.floor((srcData[srcIdx + 1] + srcData[nbrIdx + 1]) / 2);
+                    dstData[dupIdx + 2] = Math.floor((srcData[srcIdx + 2] + srcData[nbrIdx + 2]) / 2);
+                    dstData[dupIdx + 3] = Math.floor((srcData[srcIdx + 3] + srcData[nbrIdx + 3]) / 2);
+
+                    newMask[dstRow * currentWidth + x] = (maskData[srcRow * currentWidth + x] + maskData[nextRow * currentWidth + x]) / 2;
+
+                    newMaskImg.data[dupIdx] = Math.floor((oldMaskImg.data[srcIdx] + oldMaskImg.data[nbrIdx]) / 2);
+                    newMaskImg.data[dupIdx + 1] = Math.floor((oldMaskImg.data[srcIdx + 1] + oldMaskImg.data[nbrIdx + 1]) / 2);
+                    newMaskImg.data[dupIdx + 2] = Math.floor((oldMaskImg.data[srcIdx + 2] + oldMaskImg.data[nbrIdx + 2]) / 2);
+                    newMaskImg.data[dupIdx + 3] = Math.floor((oldMaskImg.data[srcIdx + 3] + oldMaskImg.data[nbrIdx + 3]) / 2);
+
+                    dstRow++;
+                    rowsInserted++;
+                }
+                srcRow++;
+            }
+        }
+
+        currentHeight = newHeight;
+        currentImgData = newImgData;
+        maskData = newMask;
+
+        imageCanvas.height = currentHeight;
+        maskCanvas.height = currentHeight;
+        interactionCanvas.height = currentHeight;
+
+        maskCtx.putImageData(newMaskImg, 0, 0);
+    }
+
     // Core execution orchestrator
     async function runCarvingProcess() {
         const targetWidth = Math.max(1, parseInt(targetWidthEl.value));
@@ -911,15 +1179,48 @@ document.addEventListener('DOMContentLoaded', () => {
         const isForward = energyModeEl.value === 'forward';
         const useLuma = useLumaEl ? useLumaEl.checked : true;
 
-        if (targetWidth > currentWidth || targetHeight > currentHeight) {
-            // Submodule supports insertion/enlargement, let's implement enlargement
-            // by adding seams.
-            statusMsgEl.textContent = "Seam insertion/enlargement is supported statically, but downscaling is optimized here.";
+        if (targetWidth === currentWidth && targetHeight === currentHeight) {
+            const warningMsg = currentLanguage === 'it' ? 
+                "Le dimensioni target sono identiche a quelle attuali. Modifica la larghezza o l'altezza per avviare il Seam Carving." : 
+                "Target dimensions are identical to current dimensions. Please change width or height to start Seam Carving.";
+            alert(warningMsg);
+            statusMsgEl.textContent = warningMsg;
+            return;
+        }
+
+        const useServer = useServerBackendEl.checked;
+
+        // Handle upscaling (enlarging) directly in client-side JS when server is disabled
+        if (!useServer && (targetWidth > currentWidth || targetHeight > currentHeight)) {
+            isProcessing = true;
+            btnRun.textContent = "Processing...";
+            statusMsgEl.textContent = currentLanguage === 'it' ? "Ingrandimento in corso (lato client)..." : "Enlarging image (client-side)...";
+            
+            // Allow DOM to update before running heavy synchronous tasks
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            if (targetWidth > currentWidth) {
+                const k = targetWidth - currentWidth;
+                insertVerticalSeams(k, isForward, useLuma);
+            }
+            if (targetHeight > currentHeight) {
+                const k = targetHeight - currentHeight;
+                insertHorizontalSeams(k, isForward, useLuma);
+            }
+
+            updateWorkspaceView();
+            updateMetrics();
+            drawInteractionCanvas();
+            isProcessing = false;
+            btnRun.textContent = translations['btn_run'] || "Run Carving";
+            statusMsgEl.textContent = currentLanguage === 'it' ? "Ridimensionamento completato con successo." : "Image resized successfully.";
+            return;
         }
 
         isProcessing = true;
         shouldStop = false;
         btnRun.textContent = "Pause Carving";
+
         progressBarContainer.style.display = 'block';
 
         const totalStepsWidth = Math.max(0, currentWidth - targetWidth);

@@ -94,6 +94,7 @@ async def carve_image(
     width: Optional[int] = Form(None, description="Target width in pixels"),
     height: Optional[int] = Form(None, description="Target height in pixels"),
     forward: bool = Form(False, description="Use the 2008 Forward Energy formula instead of classic Backward Energy"),
+    luma: bool = Form(True, description="Use perceptual luminance weights for energy calculation"),
     mask: Optional[UploadFile] = File(None, description="Optional mask image for object protection (green/white) or removal (red/black)")
 ):
     bin_p = get_binary()
@@ -118,6 +119,9 @@ async def carve_image(
                 cmd.extend(["-h", str(height)])
             if forward:
                 cmd.append("--forward")
+            if not luma:
+                cmd.append("--no-luma")
+
 
             # Save mask if provided
             if mask:

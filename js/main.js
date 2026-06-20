@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const targetWidthEl = document.getElementById('target-width');
     const targetHeightEl = document.getElementById('target-height');
     const energyModeEl = document.getElementById('energy-mode');
+    const useLumaEl = document.getElementById('use-luma');
     
     const brushProtectBtn = document.querySelector('[data-brush="protect"]');
     const brushRemoveBtn = document.querySelector('[data-brush="remove"]');
@@ -439,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Dynamic programming approach:
     // Computes energy maps, finds minimal cost path (seam), and carves it.
 
-    function getEnergyMapBackward(width, height, imgData, mask) {
+    function getEnergyMapBackward(width, height, imgData, mask, useLuma) {
         const energy = new Float32Array(width * height);
         const data = imgData.data;
 
@@ -456,18 +457,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Gradient in X
                 const idxL = (y * width + leftX) * 4;
                 const idxR = (y * width + rightX) * 4;
-                const rx = data[idxR] - data[idxL];
-                const gx = data[idxR + 1] - data[idxL + 1];
-                const bx = data[idxR + 2] - data[idxL + 2];
-                const dx2 = rx * rx + gx * gx + bx * bx;
+                
+                let dx2;
+                if (useLuma) {
+                    const lL = 0.299 * data[idxL] + 0.587 * data[idxL + 1] + 0.114 * data[idxL + 2];
+                    const lR = 0.299 * data[idxR] + 0.587 * data[idxR + 1] + 0.114 * data[idxR + 2];
+                    const dx = lR - lL;
+                    dx2 = dx * dx;
+                } else {
+                    const rx = data[idxR] - data[idxL];
+                    const gx = data[idxR + 1] - data[idxL + 1];
+                    const bx = data[idxR + 2] - data[idxL + 2];
+                    dx2 = rx * rx + gx * gx + bx * bx;
+                }
 
                 // Gradient in Y
                 const idxU = (upY * width + x) * 4;
                 const idxD = (downY * width + x) * 4;
-                const ry = data[idxD] - data[idxU];
-                const gy = data[idxD + 1] - data[idxU + 1];
-                const by = data[idxD + 2] - data[idxU + 2];
-                const dy2 = ry * ry + gy * gy + by * by;
+                
+                let dy2;
+                if (useLuma) {
+                    const lU = 0.299 * data[idxU] + 0.587 * data[idxU + 1] + 0.114 * data[idxU + 2];
+                    const lD = 0.299 * data[idxD] + 0.587 * data[idxD + 1] + 0.114 * data[idxD + 2];
+                    const dy = lD - lU;
+                    dy2 = dy * dy;
+                } else {
+                    const ry = data[idxD] - data[idxU];
+                    const gy = data[idxD + 1] - data[idxU + 1];
+                    const by = data[idxD + 2] - data[idxU + 2];
+                    dy2 = ry * ry + gy * gy + by * by;
+                }
 
                 let pixelEnergy = Math.sqrt(dx2 + dy2);
                 
@@ -503,22 +522,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Helper to get color difference between two pixels
-    function pixelDiff(idx1, idx2, data) {
-        const dr = data[idx1] - data[idx2];
-        const dg = data[idx1 + 1] - data[idx2 + 1];
-        const db = data[idx1 + 2] - data[idx2 + 2];
-        return Math.sqrt(dr * dr + dg * dg + db * db);
+    function pixelDiff(idx1, idx2, data, useLuma) {
+        if (useLuma) {
+            const l1 = 0.299 * data[idx1] + 0.587 * data[idx1 + 1] + 0.114 * data[idx1 + 2];
+            const l2 = 0.299 * data[idx2] + 0.587 * data[idx2 + 1] + 0.114 * data[idx2 + 2];
+            return Math.abs(l1 - l2);
+        } else {
+            const dr = data[idx1] - data[idx2];
+            const dg = data[idx1 + 1] - data[idx2 + 1];
+            const db = data[idx1 + 2] - data[idx2 + 2];
+            return Math.sqrt(dr * dr + dg * dg + db * db);
+        }
     }
 
     // Finding Vertical Seams
-    function findVerticalSeam(width, height, imgData, mask, isForward) {
+    function findVerticalSeam(width, height, imgData, mask, isForward, useLuma) {
         const M = new Float32Array(width * height);
         const paths = new Int32Array(width * height);
         const data = imgData.data;
 
         if (!isForward) {
             // Classical Backward Energy
-            const energy = getEnergyMapBackward(width, height, imgData, mask);
+            const energy = getEnergyMapBackward(width, height, imgData, mask, useLuma);
 
             // Populate first row
             for (let x = 0; x < width; x++) {
@@ -575,9 +600,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const idxR = (y * width + rightX) * 4;
                     const idxU = ((y - 1) * width + x) * 4;
 
-                    const cU = pixelDiff(idxR, idxL, data);
-                    const cL = cU + pixelDiff(idxU, idxL, data);
-                    const cR = cU + pixelDiff(idxU, idxR, data);
+                    const cU = pixelDiff(idxR, idxL, data, useLuma);
+                    const cL = cU + pixelDiff(idxU, idxL, data, useLuma);
+                    const cR = cU + pixelDiff(idxU, idxR, data, useLuma);
 
                     let minVal = M[(y - 1) * width + x] + cU;
                     let parent = x;
@@ -627,13 +652,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Finding Horizontal Seams
-    function findHorizontalSeam(width, height, imgData, mask, isForward) {
+    function findHorizontalSeam(width, height, imgData, mask, isForward, useLuma) {
         const M = new Float32Array(width * height);
         const paths = new Int32Array(width * height);
         const data = imgData.data;
 
         if (!isForward) {
-            const energy = getEnergyMapBackward(width, height, imgData, mask);
+            const energy = getEnergyMapBackward(width, height, imgData, mask, useLuma);
 
             // Populate first column
             for (let y = 0; y < height; y++) {
@@ -684,9 +709,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const idxD = (downY * width + x) * 4;
                     const idxL = (y * width + (x - 1)) * 4;
 
-                    const cU = pixelDiff(idxD, idxU, data);
-                    const cL = cU + pixelDiff(idxL, idxU, data);
-                    const cR = cU + pixelDiff(idxL, idxD, data);
+                    const cU = pixelDiff(idxD, idxU, data, useLuma);
+                    const cL = cU + pixelDiff(idxL, idxU, data, useLuma);
+                    const cR = cU + pixelDiff(idxL, idxD, data, useLuma);
 
                     let minVal = M[y * width + (x - 1)] + cU;
                     let parent = y;
@@ -860,6 +885,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetWidth = Math.max(1, parseInt(targetWidthEl.value));
         const targetHeight = Math.max(1, parseInt(targetHeightEl.value));
         const isForward = energyModeEl.value === 'forward';
+        const useLuma = useLumaEl ? useLumaEl.checked : true;
 
         if (targetWidth > currentWidth || targetHeight > currentHeight) {
             // Submodule supports insertion/enlargement, let's implement enlargement
@@ -935,6 +961,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('width', targetWidth);
                 formData.append('height', targetHeight);
                 formData.append('forward', isForward ? 'true' : 'false');
+                formData.append('luma', useLuma ? 'true' : 'false');
 
                 // Call REST API and read as a stream of JSON lines
                 const response = await fetch('/api/carve', {
@@ -1031,7 +1058,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         while ((currentWidth > targetWidth || currentHeight > targetHeight) && !shouldStop) {
             if (currentWidth > targetWidth) {
-                const seam = findVerticalSeam(currentWidth, currentHeight, currentImgData, maskData, isForward);
+                const seam = findVerticalSeam(currentWidth, currentHeight, currentImgData, maskData, isForward, useLuma);
                 
                 if (animate && showSeamsEl.checked) {
                     drawVerticalSeamOverlay(seam);
@@ -1050,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (currentHeight > targetHeight && !shouldStop) {
-                const seam = findHorizontalSeam(currentWidth, currentHeight, currentImgData, maskData, isForward);
+                const seam = findHorizontalSeam(currentWidth, currentHeight, currentImgData, maskData, isForward, useLuma);
 
                 if (animate && showSeamsEl.checked) {
                     drawHorizontalSeamOverlay(seam);

@@ -46,5 +46,6 @@
   "developed_by": "Sviluppato da",
   "resources": "Risorse",
   "license": "Licenza",
-  "released_under": "Rilasciato sotto"
+  "released_under": "Rilasciato sotto",
+  "setting_luma": "Usa la luminanza percettiva"
 }

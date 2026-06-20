@@ -1,0 +1,52 @@
+name: Python and C++ CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-level: '3.10'
+        cache: 'pip'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 pytest
+
+    - name: Run Python Linter
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings.
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Install CMake and Compiler
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential libomp-dev
+
+    - name: Configure CMake
+      run: cmake -B seam-carving/build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON seam-carving
+
+    - name: Build C++ Submodule
+      run: cmake --build seam-carving/build --config Release
+
+    - name: Run C++ Unit Tests
+      run: |
+        cd seam-carving/build
+        ctest --output-on-failure

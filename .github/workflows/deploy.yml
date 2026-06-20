@@ -1,0 +1,21 @@
+name: Deploy to Toolforge
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Run only after CI checks pass (optional, but recommended if we make them part of same workflow.
+    # Since they are separate files, we can just run it on push)
+    steps:
+    - name: SSH and Trigger Toolforge Deployment
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: login.toolforge.org
+        username: tools.seam-carving
+        key: ${{ secrets.TOOLFORGE_SSH_KEY }}
+        # Runs the deploy.sh script directly on the bastion
+        script: |
+          bash deploy.sh

@@ -12,3 +12,6 @@ seam-carving/build/
 build/
 bin/
 obj/
+
+# Wiki documentation
+Wiki.md
